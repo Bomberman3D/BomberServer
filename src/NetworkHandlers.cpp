@@ -174,7 +174,7 @@ void Session::ProcessPacket(SmartPacket* packet, Player* pSource)
 
                 mapdata << uint32(pInstance->m_dynRecords.size());
                 for (std::list<Instance::DynamicRecord>::const_iterator itr = pInstance->m_dynRecords.begin(); itr != pInstance->m_dynRecords.end(); ++itr)
-                    mapdata << uint32((*itr).x) << uint32((*itr).y) << uint8((*itr).type);
+                    mapdata << uint16((*itr).x) << uint16((*itr).y) << uint8((*itr).type);
                 SendPacket(pSource, &mapdata);
             }
             SmartPacket inotify(SMSG_NEW_PLAYER);
