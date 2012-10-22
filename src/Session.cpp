@@ -77,7 +77,7 @@ void Session::Worker()
         if (clientList.empty())
         {
             // Wait for longer period, no need to check for socket traffic so often if nobody's connected
-            boost::this_thread::sleep(boost::posix_time::milliseconds(100));
+            boost::this_thread::yield();
             continue;
         }
 
@@ -93,7 +93,18 @@ void Session::Worker()
                 if (result > 0)
                 {
                     sLog->NetworkOut(pClient,"Received data, size: %u",result);
-                    ProcessPacket(BuildPacket(buf,result), pClient);
+                    SmartPacket* parsed = BuildPacket(buf,result);
+                    ProcessPacket(parsed, pClient);
+
+                    int32 totalparsed = parsed->GetSize()+8;
+                    while (totalparsed < result)
+                    {
+                        parsed = BuildPacket(buf+totalparsed, result-totalparsed);
+                        sLog->NetworkOut(pClient,"Parsed additional %u bytes",parsed->GetSize());
+                        ProcessPacket(parsed, pClient);
+
+                        totalparsed += parsed->GetSize()+8;
+                    }
                 }
                 else if (result == 0 || error == SOCKETCONNRESET)
                 {
@@ -115,7 +126,7 @@ void Session::Worker()
         }
 
         // Some waiting time, could be changed if needed, but thread have to wait since select() is not present
-        boost::this_thread::sleep(boost::posix_time::milliseconds(10));
+        boost::this_thread::yield();
     }
 }
 
@@ -173,7 +184,7 @@ void Session::Acceptor()
         }
 
         // Wait for some time, could be changed if needed
-        boost::this_thread::sleep(boost::posix_time::milliseconds(10));
+        boost::this_thread::yield();
     }
 }
 

@@ -78,10 +78,8 @@ void Application::run()
     sLog->StaticOut("");
 
     sLog->StaticOut(">> Starting threads..");
-    sLog->StaticOut("Starting timer thread...");
     sLog->StaticOut("Starting network worker thread...");
     sLog->StaticOut("Starting network acceptor thread...");
-    boost::thread timerWorker(runTimerWorker);
     boost::thread networkWorker(runSessionWorker);
     boost::thread networkAcceptor(runSessionAcceptor);
 
@@ -89,8 +87,7 @@ void Application::run()
     bool ready = false;
     for (uint64 wait = sw; wait <= sw+5000; wait = clock() / CLOCK_MOD)
     {
-        ready = ThreadStatus.timer
-            && ThreadStatus.sessionworker
+        ready = ThreadStatus.sessionworker
             && ThreadStatus.sessionacceptor;
 
         if (ready)
@@ -111,6 +108,8 @@ void Application::run()
 
         if (!HandleConsoleCommand(input.c_str()))
             sLog->StringOut("No such command.");
+
+        boost::this_thread::yield();
     }
 }
 

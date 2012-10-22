@@ -60,7 +60,7 @@ void Timer::Worker()
         last = (uint64)(clock() / CLOCK_MOD);
 
         // Some waiting time, could be increased if needed
-        boost::this_thread::sleep(boost::posix_time::milliseconds(10));
+        boost::this_thread::yield();
     }
 }
 

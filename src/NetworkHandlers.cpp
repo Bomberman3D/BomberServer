@@ -44,6 +44,7 @@ void Session::SendPacket(SOCK socket, SmartPacket *data)
     unsigned int size = (unsigned int)data->GetSize();
     memcpy(&buff[4],&size,sizeof(unsigned int));
 
+    data->SetPos(0);
     for(size_t i = 0; i < size; i++)
     {
         *data >> buff[8+i];
@@ -82,6 +83,9 @@ SmartPacket* Session::BuildPacket(const char *buffer, uint32 size)
 
 void Session::ProcessPacket(SmartPacket* packet, Player* pSource)
 {
+    if (!packet || !pSource)
+        return;
+
     switch(packet->GetOpcode())
     {
         case CMSG_INITIATE_SESSION:
@@ -134,6 +138,7 @@ void Session::ProcessPacket(SmartPacket* packet, Player* pSource)
                 SendPacket(pSource, &response);
                 return;
             }
+            Instance* pInstance = sInstanceManager->GetPlayerInstance(pSource);
 
             // TODO: nacteni start. pozic ze souboru
             pSource->m_positionX = 1.0f;
@@ -144,12 +149,12 @@ void Session::ProcessPacket(SmartPacket* packet, Player* pSource)
             response << float(pSource->m_positionX); // startovni pozice X
             response << float(pSource->m_positionY); // startovni pozice Y (klientsky Z)
             response << uint32(pSource->m_socket);   // jako ID pouzijeme socket ID
+            response << uint32(pInstance->mapId);
             response << instanceId;
             SendPacket(pSource, &response);
 
             SmartPacket mapdata(SMSG_MAP_INITIAL_DATA);
 
-            Instance* pInstance = sInstanceManager->GetPlayerInstance(pSource);
             if (pInstance)
             {
                 for (int i = 0; i < MAX_PLAYERS_PER_INSTANCE; i++)
@@ -184,6 +189,62 @@ void Session::ProcessPacket(SmartPacket* packet, Player* pSource)
             inotify << uint8(pSource->m_modelIdOffset); // offset modelu, klient si s tim poradi
             inotify << nickname.c_str();                // nick
             sInstanceManager->SendInstancePacket(&inotify, instanceId);
+            break;
+        }
+        case CMSG_MOVE_START:
+        {
+            Instance* pInstance = sInstanceManager->GetPlayerInstance(pSource);
+            if (!pInstance)
+                break;
+
+            float rot;
+            *packet >> rot;
+
+            SmartPacket pkt(SMSG_MOVE_START);
+            pkt << uint32(pSource->m_socket);
+            pkt << float(rot);
+            sInstanceManager->SendInstancePacket(&pkt, pInstance->id);
+            break;
+        }
+        case CMSG_MOVE_STOP:
+        {
+            Instance* pInstance = sInstanceManager->GetPlayerInstance(pSource);
+            if (!pInstance)
+                break;
+
+            float rot;
+            *packet >> rot;
+
+            SmartPacket pkt(SMSG_MOVE_STOP);
+            pkt << uint32(pSource->m_socket);
+            pkt << float(rot);
+            sInstanceManager->SendInstancePacket(&pkt, pInstance->id);
+            break;
+        }
+        case CMSG_MOVE_HEARTBEAT:
+        {
+            Instance* pInstance = sInstanceManager->GetPlayerInstance(pSource);
+            if (!pInstance)
+                break;
+
+            float x, y, z, rot, speed;
+            *packet >> x >> y >> z;
+            *packet >> rot;
+            *packet >> speed;
+
+            pSource->m_positionX = x;
+            pSource->m_positionY = y;
+            pSource->m_orientation = rot;
+
+            SmartPacket hb(SMSG_MOVE_HEARTBEAT);
+            hb << uint32(pSource->m_socket);
+            hb << float(x);
+            hb << float(y);
+            hb << float(z);
+
+            hb << float(rot);
+            hb << float(speed);
+            sInstanceManager->SendInstancePacket(&hb, pInstance->id);
             break;
         }
         case MSG_NONE:
