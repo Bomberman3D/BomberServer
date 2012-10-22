@@ -8,7 +8,6 @@ SET( INCLUDE
      "${TARGET_INCLUDE_DIR}/Session.h"
      "${TARGET_INCLUDE_DIR}/Singleton.h"
      "${TARGET_INCLUDE_DIR}/Storage.h"
-     "${TARGET_INCLUDE_DIR}/Timer.h"
 
      "${TARGET_INCLUDE_DIR}/Packets/Opcodes.h"
      "${TARGET_INCLUDE_DIR}/Packets/SmartPacket.h"
@@ -23,7 +22,6 @@ SET( SOURCE
      "${TARGET_SOURCE_DIR}/NetworkHandlers.cpp"
      "${TARGET_SOURCE_DIR}/Session.cpp"
      "${TARGET_SOURCE_DIR}/Storage.cpp"
-     "${TARGET_SOURCE_DIR}/Timer.cpp"
 
      "${TARGET_SOURCE_DIR}/Shared/Shared.cpp" )
 

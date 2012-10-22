@@ -28,11 +28,9 @@ class Application
     {
         thr_status()
         {
-            timer = false;
             sessionworker = false;
             sessionacceptor = false;
         }
-        bool timer;
         bool sessionworker;
         bool sessionacceptor;
     } ThreadStatus;

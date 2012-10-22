@@ -12,7 +12,6 @@
 #include "Log.h"
 #include "Config.h"
 #include "Storage.h"
-#include "Timer.h"
 #include "Session.h"
 #include "Map.h"
 #include "Instance.h"

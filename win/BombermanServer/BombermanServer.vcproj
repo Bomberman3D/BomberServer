@@ -213,10 +213,6 @@
 				RelativePath="..\..\src\Storage.cpp"
 				>
 			</File>
-			<File
-				RelativePath="..\..\src\Timer.cpp"
-				>
-			</File>
 		</Filter>
 		<Filter
 			Name="Headers"
@@ -263,10 +259,6 @@
 			</File>
 			<File
 				RelativePath="..\..\include\Storage.h"
-				>
-			</File>
-			<File
-				RelativePath="..\..\include\Timer.h"
 				>
 			</File>
 			<Filter
