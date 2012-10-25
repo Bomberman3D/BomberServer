@@ -7,6 +7,15 @@
 #include <vector>
 #include <map>
 
+// Typy pole mapy
+enum FieldType
+{
+    TYPE_GROUND    = 0,
+    TYPE_SOLID_BOX = 1,
+    TYPE_ROCK      = 2,
+    TYPE_STARTLOC  = 3,
+};
+
 // Jedna bunka mapy
 struct cell
 {
@@ -31,7 +40,7 @@ struct Map
     std::string mapname;
     uint32 startloc[8]; //x1,y1,x2,y2,x3,y3,x4,y4
 
-    bool IsStartLoc(int32 x, int32 y);
+    bool IsNearStartLoc(int32 x, int32 y);
 };
 
 // Vychozi chunk z mapy

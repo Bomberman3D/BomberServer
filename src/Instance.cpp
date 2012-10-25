@@ -202,14 +202,7 @@ void Instance::GenerateRandomDynamicRecords()
         {
             if (myMap->field[i][j].type == 0) // type ground
             {
-                if (   !myMap->IsStartLoc(i-1,j-1)
-                    && !myMap->IsStartLoc(i-1,j  )
-                    && !myMap->IsStartLoc(i-1,j+1)
-                    && !myMap->IsStartLoc(i+1,j-1)
-                    && !myMap->IsStartLoc(i+1,j  )
-                    && !myMap->IsStartLoc(i+1,j+1)
-                    && !myMap->IsStartLoc(i  ,j-1)
-                    && !myMap->IsStartLoc(i  ,j+1))
+                if (!myMap->IsNearStartLoc(i,j))
                     freeSpots.push_back(std::make_pair<uint32, uint32>(i,j));
             }
         }

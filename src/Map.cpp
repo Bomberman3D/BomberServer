@@ -106,14 +106,24 @@ Map* MapManager::GetMap(int32 id)
     return m_Maps[id];
 }
 
-bool Map::IsStartLoc(int32 x, int32 y)
+bool Map::IsNearStartLoc(int32 x, int32 y)
 {
     if (x < 0 || y < 0)
         return false;
 
-    for (int i = 0; i < 4; i++)
-        if (startloc[i*2] == x && startloc[(i*2)+1] == y)
-            return true;
+    if (field.size() < 1 || field[0].size() < 1)
+        return false;
+
+    if (field[x][y].type == TYPE_STARTLOC)
+        return true;
+
+    if (x > 0 && y > 0 && x < int32(field.size())-1 && y < int32(field[0].size())-1)
+    {
+        for (int32 i = -1; i <= 1; i++)
+            for (int32 j = -1; j <= 1; j++)
+                if (field[x+i][y+j].type == TYPE_STARTLOC)
+                    return true;
+    }
 
     return false;
 }
