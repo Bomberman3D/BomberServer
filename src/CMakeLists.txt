@@ -1,7 +1,6 @@
 SET( INCLUDE
      "${TARGET_INCLUDE_DIR}/Application.h"
      "${TARGET_INCLUDE_DIR}/Config.h"
-     "${TARGET_INCLUDE_DIR}/Database.h"
      "${TARGET_INCLUDE_DIR}/global.h"
      "${TARGET_INCLUDE_DIR}/Log.h"
      "${TARGET_INCLUDE_DIR}/NetworkHandlers.h"
@@ -16,7 +15,6 @@ SET( INCLUDE
 SET( SOURCE
      "${TARGET_SOURCE_DIR}/Application.cpp"
      "${TARGET_SOURCE_DIR}/Config.cpp"
-     "${TARGET_SOURCE_DIR}/Database.cpp"
      "${TARGET_SOURCE_DIR}/Log.cpp"
      "${TARGET_SOURCE_DIR}/main.cpp"
      "${TARGET_SOURCE_DIR}/NetworkHandlers.cpp"
@@ -38,9 +36,7 @@ ADD_EXECUTABLE( "${TARGET_NAME}"
                 ${INCLUDE} ${SOURCE} )
 
 TARGET_LINK_LIBRARIES( "${TARGET_NAME}"
-                       ${MYSQL_LIBRARIES}
-                       ${MYSQLPP_LIBRARIES}
-                       ${Boost_LIBRARIES} )
+                       ${Boost_LIBRARIES} pthread )
 
 IF( WIN32 )
     TARGET_LINK_LIBRARIES( "${TARGET_NAME}"
@@ -49,4 +45,4 @@ ENDIF( WIN32 )
 
 SET( ${TARGET_NAME}_INCLUDE_DIR "${TARGET_INCLUDE_DIR}" PARENT_SCOPE )
 
-INSTALL(TARGETS ServerFramework DESTINATION bin)
+INSTALL(TARGETS Bomberman3DServer DESTINATION bin)
