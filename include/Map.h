@@ -16,13 +16,23 @@ enum FieldType
     TYPE_STARTLOC  = 3,
 };
 
+// Typy dynamickych poli mapy
+enum DynamicFieldType
+{
+    DYNAMIC_TYPE_NONE  = 0,
+    DYNAMIC_TYPE_BOX   = 1,
+    DYNAMIC_TYPE_ENEMY = 2,
+    DYNAMIC_TYPE_BOMB  = 3,
+    DYNAMIC_TYPE_BONUS = 4,
+};
+
 // Jedna bunka mapy
 struct cell
 {
     uint16 type;
     uint16 texture;
 };
-typedef std::vector<std::vector<cell>> CellVector;
+typedef std::vector< std::vector<cell> > CellVector;
 
 struct Map
 {
