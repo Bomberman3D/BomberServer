@@ -18,6 +18,14 @@
 
 #include <ctime>
 
+Application::Application()
+{
+    m_commandQueueLock = false;
+
+    for (uint32 i = 0; i < MAX_DEBUG_SUBJECT; i++)
+        m_debugState[i] = false;
+}
+
 void Application::init()
 {
     sLog->init();
@@ -107,14 +115,12 @@ void Application::run()
     sLog->StaticOut("Starting network worker thread...");
     sLog->StaticOut("Starting network acceptor thread...");
     boost::thread networkWorker(runSessionWorker);
-    boost::thread networkAcceptor(runSessionAcceptor);
 
     uint64 sw = clock() / CLOCK_MOD;
     bool ready = false;
     for (uint64 wait = sw; wait <= sw+5000; wait = clock() / CLOCK_MOD)
     {
-        ready = ThreadStatus.sessionworker
-            && ThreadStatus.sessionacceptor;
+        ready = ThreadStatus.sessionworker;
 
         if (ready)
             break;
@@ -195,5 +201,53 @@ bool Application::HandleConsoleCommand(const char *input)
         sLog->StringOut("Usage: exit\nNo arguments");
         return true;
     }
+    else if ((cmpres = mstrcmp("debug",input)) == 1 || cmpres == 0)
+    {
+        char* arg = new char[1024];
+        strcpy(arg,&(input[6]));
+
+        if (cmpres == 1)
+        {
+            if (mstrcmp("network", arg) == 0)
+            {
+                if (sApp->isDebug(DEBUG_NETWORK))
+                {
+                    sLog->StringOut("Debugging mode for networking is now shut down");
+                    sApp->setDebug(DEBUG_NETWORK, false);
+                }
+                else
+                {
+                    sLog->StringOut("Starting debugging mode for networking");
+                    sApp->setDebug(DEBUG_NETWORK, true);
+                }
+            }
+            else if (mstrcmp("system", arg) == 0)
+            {
+                if (sApp->isDebug(DEBUG_SYSTEM))
+                {
+                    sLog->StringOut("Debugging mode for system stuff is now shut down");
+                    sApp->setDebug(DEBUG_SYSTEM, false);
+                }
+                else
+                {
+                    sLog->StringOut("Starting debugging mode for system stuff");
+                    sApp->setDebug(DEBUG_SYSTEM, true);
+                }
+            }
+            else
+                cmpres = 0;
+        }
+
+        if (cmpres == 0)
+        {
+            sLog->StringOut("Usage: debug $subject\n$subject - subject to debug");
+            sLog->StringOut("\nAvailable subjects:");
+
+            sLog->StringOut("network  - debugs network traffic");
+            sLog->StringOut("system   - debugs other system stuff");
+        }
+        return true;
+    }
+
     return false;
 }

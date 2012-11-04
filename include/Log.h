@@ -23,7 +23,9 @@ class Log
     void StringOut(const char* str, ...);
     void StringOutLine(const char* str, ...);
     void ErrorOut(const char* str, ...);
+    void DebugOut(const char* str, ...);
     void NetworkOut(Client* pClient, const char* str, ...);
+    void NetworkDebugOut(Client* pClient, const char* str, ...);
 
     void SetConsoleColor(int32 color);
 };

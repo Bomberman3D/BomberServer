@@ -8,6 +8,7 @@
 
 #include <global.h>
 #include "Log.h"
+#include "Application.h"
 
 #ifdef _WIN32
  #include <windows.h>
@@ -59,6 +60,19 @@ void Log::ErrorOut(const char *str, ...)
     cout << buf << endl;
 }
 
+void Log::DebugOut(const char *str, ...)
+{
+    if (!sApp->isDebug(DEBUG_SYSTEM))
+        return;
+
+    va_list argList;
+    va_start(argList,str);
+    char buf[2048];
+    vsnprintf(buf,2048,str,argList);
+    va_end(argList);
+    cout << buf << endl;
+}
+
 void Log::NetworkOut(Client* pClient, const char *str, ...)
 {
     if (!pClient)
@@ -66,6 +80,23 @@ void Log::NetworkOut(Client* pClient, const char *str, ...)
         ErrorOut("Invalid (NULL) Client pointer as argument in Log::NetworkOut");
         return;
     }
+
+    va_list argList;
+    va_start(argList,str);
+    char buf[2048];
+    vsnprintf(buf,2048,str,argList);
+    va_end(argList);
+    cout << "Network: ";
+    SetConsoleColor(2);
+    cout << pClient->m_socket;
+    SetConsoleColor(0);
+    cout << ": " << buf << endl;
+}
+
+void Log::NetworkDebugOut(Client* pClient, const char *str, ...)
+{
+    if (!sApp->isDebug(DEBUG_NETWORK))
+        return;
 
     va_list argList;
     va_start(argList,str);
