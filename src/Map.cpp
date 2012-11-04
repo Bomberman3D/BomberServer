@@ -43,7 +43,7 @@ bool MapManager::Initialize()
 
 bool MapManager::LoadMap(const char* mappath, Map* dest)
 {
-    FILE* MapFile = fopen(mappath,"r");
+    FILE* MapFile = fopen(mappath,"rb");
 
     if (!MapFile)
         return false;
@@ -54,7 +54,7 @@ bool MapManager::LoadMap(const char* mappath, Map* dest)
     fread(mapname,1,namesize,MapFile);
     mapname[namesize] = 0;
     dest->mapname = mapname;
-    fread(&dest->skybox,2,1,MapFile);
+    fread(&dest->skybox,sizeof(uint16),1,MapFile);
 
     MapChunk* pChunk = new MapChunk;
 
@@ -62,7 +62,7 @@ bool MapManager::LoadMap(const char* mappath, Map* dest)
     dest->field.resize(1);
     dest->field[0].resize(1);
 
-    while(fread(pChunk,sizeof(MapChunk),1,MapFile) > 0)
+    while (fread(pChunk,sizeof(MapChunk),1,MapFile) > 0)
     {
         if (pChunk->x > dest->field.size()-1)
         {
@@ -91,6 +91,8 @@ bool MapManager::LoadMap(const char* mappath, Map* dest)
             }
         }
     }
+
+    fclose(MapFile);
 
     return true;
 }

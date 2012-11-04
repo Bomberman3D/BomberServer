@@ -54,6 +54,7 @@ struct Map
 };
 
 // Vychozi chunk z mapy
+#pragma pack(push, 1)
 struct MapChunk
 {
     uint32 x;
@@ -61,6 +62,7 @@ struct MapChunk
     uint16 type;
     uint16 texture;
 };
+#pragma pack(pop)
 
 static const struct { uint32 id : 4; std::string name; } PresentMaps[] = {
     {1, "001.bm"},
