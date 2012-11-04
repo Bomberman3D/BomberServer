@@ -290,5 +290,5 @@ void Session::ProcessPacket(SmartPacket* packet, Player* pSource)
             sLog->ErrorOut("Received unknown/invalid opcode: %u",packet->GetOpcode());
             break;
     }
-    sLog->StringOut("Finished handling of 0x%.2X", packet->GetOpcode());
+    sLog->NetworkDebugOut(pSource, "Finished handling of 0x%.2X", packet->GetOpcode());
 }

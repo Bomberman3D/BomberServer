@@ -70,7 +70,6 @@ class Session
         bool Startup();
 
         void Worker();
-        void Acceptor();
 
         SmartPacket* BuildPacket(const char* buffer, uint32 size);
         void BroadcastPacket(SmartPacket* data);
@@ -93,6 +92,5 @@ class Session
 static Session* sSession = Singleton<Session>::Instance();
 
 extern void runSessionWorker();
-extern void runSessionAcceptor();
 
 #endif

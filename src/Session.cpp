@@ -45,6 +45,12 @@ bool Session::Startup()
         return false;
     }
 
+    if (listen(m_socket, 10) == -1)
+    {
+        sLog->ErrorOut("Couldn't create connection queue");
+        return false;
+    }
+
 #ifdef _WIN32
     u_long arg = 1;
     if (ioctlsocket(m_socket, FIONBIO, &arg) == SOCKET_ERROR)
@@ -69,11 +75,39 @@ void Session::Worker()
 
     char* buf = new char[BUFFER_LEN];
     int result, error;
+    SOCK res;
     Player* pClient = NULL;
+    Player* pNew = new Player;
+    pNew->m_addrLen = sizeof(pNew->m_sockInfo);
     std::list<Player*>::iterator itr;
 
     while(1)
     {
+        res = accept(m_socket, (sockaddr*)&pNew->m_sockInfo, &pNew->m_addrLen);
+        error = LASTERROR();
+
+        if (res == INVALID_SOCKET && error == SOCKETWOULDBLOCK)
+        {
+            // zadne prichozi spojeni
+        }
+        else if (res == INVALID_SOCKET && error != SOCKETWOULDBLOCK)
+        {
+            sLog->ErrorOut("Socket error: %i", error);
+        }
+        else
+        {
+            pNew->m_socket = res;
+            pNew->m_addrLen = sizeof(pNew->m_sockInfo);
+
+            sLog->DebugOut("Accepting connection from %s",inet_ntoa((in_addr)pNew->m_sockInfo.sin_addr));
+
+            clientList.push_back(pNew);
+            sLog->NetworkDebugOut(pNew,"Inserted into client list");
+
+            pNew = new Player;
+            pNew->m_addrLen = sizeof(pNew->m_sockInfo);
+        }
+
         if (clientList.empty())
         {
             // Wait for longer period, no need to check for socket traffic so often if nobody's connected
@@ -92,11 +126,11 @@ void Session::Worker()
 
                 if (result > 0)
                 {
-                    sLog->NetworkOut(pClient,"Received data, size: %u",result);
+                    sLog->NetworkDebugOut(pClient,"Received data, size: %u",result);
                     SmartPacket* parsed = BuildPacket(buf,result);
                     if (parsed)
                     {
-                        sLog->NetworkOut(pClient,"Opcode 0x%.2X, size %u", parsed->GetOpcode(), parsed->GetSize());
+                        sLog->NetworkDebugOut(pClient,"Opcode 0x%.2X, size %u", parsed->GetOpcode(), parsed->GetSize());
                         ProcessPacket(parsed, pClient);
 
                         int32 totalparsed = parsed->GetSize()+8;
@@ -105,8 +139,8 @@ void Session::Worker()
                             parsed = BuildPacket(buf+totalparsed, result-totalparsed);
                             if (parsed)
                             {
-                                sLog->NetworkOut(pClient,"Parsed additional %u bytes",parsed->GetSize());
-                                sLog->NetworkOut(pClient,"Opcode 0x%.2X, size %u", parsed->GetOpcode(), parsed->GetSize());
+                                sLog->NetworkDebugOut(pClient,"Parsed additional %u bytes",parsed->GetSize());
+                                sLog->NetworkDebugOut(pClient,"Opcode 0x%.2X, size %u", parsed->GetOpcode(), parsed->GetSize());
                                 ProcessPacket(parsed, pClient);
                                 totalparsed += parsed->GetSize()+8;
                             }
@@ -117,7 +151,7 @@ void Session::Worker()
                 }
                 else if (result == 0 || error == SOCKETCONNRESET)
                 {
-                    sLog->NetworkOut(pClient,"Client disconnected");
+                    sLog->NetworkDebugOut(pClient,"Client disconnected");
                     sInstanceManager->RemovePlayerFromInstances(pClient);
                     itr = clientList.erase(itr);
                     continue;
@@ -142,64 +176,6 @@ void Session::Worker()
 void runSessionWorker()
 {
     sSession->Worker();
-}
-
-void Session::Acceptor()
-{
-    sLog->StaticOut("Network acceptor thread running");
-    sApp->ThreadStatus.sessionacceptor = true;
-
-    int res, error;
-
-    Player* pNew = new Player;
-    pNew->m_addrLen = sizeof(pNew->m_sockInfo);
-    SOCK result;
-
-    res = listen(m_socket, 10);
-    if (res == -1)
-    {
-        sLog->ErrorOut("Couldn't create connection queue");
-        sApp->ThreadStatus.sessionacceptor = false;
-        return;
-    }
-
-    while(1)
-    {
-        result = accept(m_socket, (sockaddr*)&pNew->m_sockInfo, &pNew->m_addrLen);
-        error = LASTERROR();
-
-        if (result == INVALID_SOCKET && error == SOCKETWOULDBLOCK)
-        {
-            //failed to accept
-            //TODO: some error message
-        }
-        else if (result == INVALID_SOCKET && error != SOCKETWOULDBLOCK)
-        {
-            //invalid socket
-            //TODO: some error message
-        }
-        else
-        {
-            pNew->m_socket = result;
-            pNew->m_addrLen = sizeof(pNew->m_sockInfo);
-
-            sLog->StringOut("Accepting connection from %s",inet_ntoa((in_addr)pNew->m_sockInfo.sin_addr));
-
-            clientList.push_back(pNew);
-            sLog->NetworkOut(pNew,"Inserted into client list");
-
-            pNew = new Player;
-            pNew->m_addrLen = sizeof(pNew->m_sockInfo);
-        }
-
-        // Wait for some time, could be changed if needed
-        boost::this_thread::yield();
-    }
-}
-
-void runSessionAcceptor()
-{
-    sSession->Acceptor();
 }
 
 Player* Session::GetPlayerByName(const char* name)
