@@ -21,6 +21,7 @@ class Log
 
     void StaticOut(const char* c);
     void StringOut(const char* str, ...);
+    void StringOutLine(const char* str, ...);
     void ErrorOut(const char* str, ...);
     void NetworkOut(Client* pClient, const char* str, ...);
 

@@ -177,9 +177,17 @@ void Session::ProcessPacket(SmartPacket* packet, Player* pSource)
                     }
                 }
 
+                while (pInstance->m_sharedMapsLock)
+                    boost::this_thread::yield();
+
+                pInstance->m_sharedMapsLock = true;
+
                 mapdata << uint32(pInstance->m_dynRecords.size());
                 for (std::list<Instance::DynamicRecord>::const_iterator itr = pInstance->m_dynRecords.begin(); itr != pInstance->m_dynRecords.end(); ++itr)
                     mapdata << uint16((*itr).x) << uint16((*itr).y) << uint8((*itr).type);
+
+                pInstance->m_sharedMapsLock = false;
+
                 SendPacket(pSource, &mapdata);
             }
             SmartPacket inotify(SMSG_NEW_PLAYER);
@@ -200,6 +208,9 @@ void Session::ProcessPacket(SmartPacket* packet, Player* pSource)
             float rot;
             *packet >> rot;
 
+            pSource->m_isMoving = true;
+            pSource->m_orientation = rot;
+
             SmartPacket pkt(SMSG_MOVE_START);
             pkt << uint32(pSource->m_socket);
             pkt << float(rot);
@@ -214,6 +225,9 @@ void Session::ProcessPacket(SmartPacket* packet, Player* pSource)
 
             float rot;
             *packet >> rot;
+
+            pSource->m_isMoving = false;
+            pSource->m_orientation = rot;
 
             SmartPacket pkt(SMSG_MOVE_STOP);
             pkt << uint32(pSource->m_socket);
@@ -233,7 +247,7 @@ void Session::ProcessPacket(SmartPacket* packet, Player* pSource)
             *packet >> speed;
 
             pSource->m_positionX = x;
-            pSource->m_positionY = y;
+            pSource->m_positionY = z;
             pSource->m_orientation = rot;
 
             SmartPacket hb(SMSG_MOVE_HEARTBEAT);
@@ -247,9 +261,34 @@ void Session::ProcessPacket(SmartPacket* packet, Player* pSource)
             sInstanceManager->SendInstancePacket(&hb, pInstance->id);
             break;
         }
+        case CMSG_PLANT_BOMB:
+        {
+            Instance* pInstance = sInstanceManager->GetPlayerInstance(pSource);
+            if (!pInstance)
+                break;
+
+            uint32 x, y;
+
+            *packet >> x;
+            *packet >> y;
+
+            if (pInstance->AddBomb(x, y, pSource->m_socket, pSource->m_bonuses[BONUS_FLAME]+1))
+            {
+                pSource->m_activeBombs += 1;
+
+                SmartPacket bomb(SMSG_PLANT_BOMB);
+                bomb << uint32(pSource->m_socket);
+                bomb << uint32(x);
+                bomb << uint32(y);
+                bomb << uint32(pSource->m_bonuses[BONUS_FLAME]+1); // dosah bomby
+                sInstanceManager->SendInstancePacket(&bomb, pInstance->id);
+            }
+            break;
+        }
         case MSG_NONE:
         default:
             sLog->ErrorOut("Received unknown/invalid opcode: %u",packet->GetOpcode());
             break;
     }
+    sLog->StringOut("Finished handling of 0x%.2X", packet->GetOpcode());
 }

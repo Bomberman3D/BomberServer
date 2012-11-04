@@ -36,6 +36,16 @@ void Log::StringOut(const char *str, ...)
     cout << buf << endl;
 }
 
+void Log::StringOutLine(const char *str, ...)
+{
+    va_list argList;
+    va_start(argList,str);
+    char buf[2048];
+    vsnprintf(buf,2048,str,argList);
+    va_end(argList);
+    cout << buf;
+}
+
 void Log::ErrorOut(const char *str, ...)
 {
     va_list argList;

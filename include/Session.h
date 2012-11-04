@@ -46,9 +46,9 @@
  #define LASTERROR() errno
 #endif
 
-// Network buffer length = 1 kB
+// Network buffer length = 8 kB
 // If necessary, you can change it
-#define BUFFER_LEN 1*1024
+#define BUFFER_LEN 8*1024
 
 struct Client
 {
@@ -80,6 +80,7 @@ class Session
         void ProcessPacket(SmartPacket* packet, Player* pSource);
 
         Player* GetPlayerByName(const char* name);
+        Player* GetPlayerById(uint32 id);
 
     protected:
         std::list<Player*> clientList;

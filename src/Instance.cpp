@@ -1,6 +1,7 @@
 #include <global.h>
 #include "Instance.h"
 #include "Map.h"
+#include "Log.h"
 
 #include <sstream>
 
@@ -112,6 +113,11 @@ void InstanceManager::RegisterPlayer(Player *pPlayer, uint32 instanceId)
     if (pInstance->players >= pInstance->maxplayers)
         return;
 
+    while (pInstance->m_playerMapLock)
+        boost::this_thread::yield();
+
+    pInstance->m_playerMapLock = true;
+
     for (int i = 0; i < MAX_PLAYERS_PER_INSTANCE; i++)
     {
         if (!pInstance->pPlayers[i])
@@ -119,9 +125,13 @@ void InstanceManager::RegisterPlayer(Player *pPlayer, uint32 instanceId)
             pInstance->pPlayers[i] = pPlayer;
             pInstance->players += 1;
             pPlayer->m_modelIdOffset = i;
+
+            pInstance->m_playerMapLock = false;
             return;
         }
     }
+
+    pInstance->m_playerMapLock = false;
 }
 
 Instance* InstanceManager::GetPlayerInstance(Player *pPlayer)
@@ -131,11 +141,21 @@ Instance* InstanceManager::GetPlayerInstance(Player *pPlayer)
 
     for (std::map<uint32, Instance*>::iterator itr = m_Instances.begin(); itr != m_Instances.end(); ++itr)
     {
+        /*while (itr->second->m_playerMapLock)
+            boost::this_thread::yield();
+
+        itr->second->m_playerMapLock = true;*/
+
         for (int i = 0; i < MAX_PLAYERS_PER_INSTANCE; i++)
         {
             if (itr->second->pPlayers[i] == pPlayer)
+            {
+                //itr->second->m_playerMapLock = false;
                 return itr->second;
+            }
         }
+
+        //itr->second->m_playerMapLock = false;
     }
 
     return NULL;
@@ -159,6 +179,11 @@ void InstanceManager::RemovePlayerFromInstances(Player* pPlayer)
         if (!itr->second)
             continue;
 
+        while (itr->second->m_playerMapLock)
+            boost::this_thread::yield();
+
+        itr->second->m_playerMapLock = true;
+
         for (uint8 i = 0; i < MAX_PLAYERS_PER_INSTANCE; i++)
             if (itr->second->pPlayers[i] == pPlayer)
             {
@@ -166,20 +191,33 @@ void InstanceManager::RemovePlayerFromInstances(Player* pPlayer)
                 if (itr->second->players > 0)
                     itr->second->players -= 1;
             }
+
+        itr->second->m_playerMapLock = false;
     }
 }
 
-void InstanceManager::SendInstancePacket(SmartPacket *data, uint32 instanceId)
+void InstanceManager::SendInstancePacket(SmartPacket *data, uint32 instanceId, bool alreadyLocked)
 {
     Instance* pInstance = m_Instances[instanceId];
     if (!pInstance)
         return;
+
+    /*if (!alreadyLocked)
+    {
+        while (!alreadyLocked && pInstance->m_playerMapLock)
+            boost::this_thread::yield();
+
+        pInstance->m_playerMapLock = true;
+    }*/
 
     for (int i = 0; i < MAX_PLAYERS_PER_INSTANCE; i++)
     {
         if (pInstance->pPlayers[i])
             sSession->SendPacket(pInstance->pPlayers[i], data);
     }
+
+    /*if (!alreadyLocked)
+        pInstance->m_playerMapLock = false;*/
 }
 
 void Instance::GenerateRandomDynamicRecords()
@@ -190,7 +228,7 @@ void Instance::GenerateRandomDynamicRecords()
 
     m_dynRecords.clear();
 
-    std::list<std::pair<uint32, uint32>> freeSpots;
+    std::list< std::pair<uint32, uint32> > freeSpots;
     freeSpots.clear();
 
     uint32 width = myMap->field.size();
@@ -209,14 +247,368 @@ void Instance::GenerateRandomDynamicRecords()
     }
 
     DynamicRecord temp;
-    for(std::list<std::pair<uint32, uint32>>::const_iterator itr = freeSpots.begin(); itr != freeSpots.end(); ++itr)
+    for(std::list< std::pair<uint32, uint32> >::const_iterator itr = freeSpots.begin(); itr != freeSpots.end(); ++itr)
     {
         if (rand()%2 > 0)
         {
             temp.x = (*itr).first;
             temp.y = (*itr).second;
-            temp.type = 1;
+            temp.type = DYNAMIC_TYPE_BOX;
             m_dynRecords.push_back(temp);
         }
     }
+}
+
+bool Instance::AddBomb(uint32 x, uint32 y, uint32 owner, uint32 reach)
+{
+    Map* myMap = sMapManager->GetMap(mapId);
+    if (!myMap)
+        return false;
+
+    if (myMap->field.size() < x || myMap->field[0].size() < y)
+        return false;
+
+    while (m_sharedMapsLock)
+        boost::this_thread::yield();
+
+    m_sharedMapsLock = true;
+
+    DynamicRecord tmp;
+
+    tmp.x = x;
+    tmp.y = y;
+    tmp.type = DYNAMIC_TYPE_BOMB;
+
+    m_dynRecords.push_back(tmp);
+
+    BombRecord bomb;
+    bomb.x = x;
+    bomb.y = y;
+    bomb.owner = owner;
+    bomb.boomTime = clock()+2500;
+    bomb.reach = reach;
+
+    m_bombMap.push_back(bomb);
+
+    m_sharedMapsLock = false;
+
+    return true;
+}
+
+void InstanceManager::Update()
+{
+    for (std::map<uint32, Instance*>::iterator itr = m_Instances.begin(); itr != m_Instances.end(); ++itr)
+        if ((*itr).second)
+            (*itr).second->Update();
+}
+
+uint32 Instance::GetBombingDistanceInDir(uint32 x, uint32 y, uint32 reach, uint8 dir)
+{
+    int32 finalreach = -1;
+    Map* map = sMapManager->GetMap(mapId);
+
+    if (dir == DIR_X_POS)
+    {
+        for (int32 i = x; i <= int32(x+reach); i++)
+        {
+            if (i >= int32(map->field.size()))
+            {
+                finalreach = map->field.size()-1;
+                break;
+            }
+
+            if (map->field[i][y].type == TYPE_SOLID_BOX || map->field[i][y].type == TYPE_ROCK)
+            {
+                finalreach = i-1;
+                break;
+            }
+
+            for (std::list<DynamicRecord>::iterator itr = m_dynRecords.begin(); itr != m_dynRecords.end(); ++itr)
+            {
+                if ((*itr).x == i && (*itr).y == y &&
+                    ((*itr).type == DYNAMIC_TYPE_BOX/* || (*itr).type == DYNAMIC_TYPE_BOMB*/))
+                {
+                    finalreach = i;
+                    break;
+                }
+            }
+            if (finalreach != -1)
+                break;
+        }
+    }
+    else if (dir == DIR_X_NEG)
+    {
+        for (int32 i = x; i >= int32(x-reach); i--)
+        {
+            if (i <= 0)
+            {
+                finalreach = i+1;
+                break;
+            }
+
+            if (map->field[i][y].type == TYPE_SOLID_BOX || map->field[i][y].type == TYPE_ROCK)
+            {
+                finalreach = i+1;
+                break;
+            }
+
+            for (std::list<DynamicRecord>::iterator itr = m_dynRecords.begin(); itr != m_dynRecords.end(); ++itr)
+            {
+                if ((*itr).x == i && (*itr).y == y &&
+                    ((*itr).type == DYNAMIC_TYPE_BOX/* || (*itr).type == DYNAMIC_TYPE_BOMB*/))
+                {
+                    finalreach = i;
+                    break;
+                }
+            }
+            if (finalreach != -1)
+                break;
+        }
+    }
+    else if (dir == DIR_Y_POS)
+    {
+        for (int32 i = y; i <= int32(y+reach); i++)
+        {
+            if (i >= int32(map->field[0].size()))
+            {
+                finalreach = map->field[0].size()-1;
+                break;
+            }
+
+            if (map->field[x][i].type == TYPE_SOLID_BOX || map->field[x][i].type == TYPE_ROCK)
+            {
+                finalreach = i-1;
+                break;
+            }
+
+            for (std::list<DynamicRecord>::iterator itr = m_dynRecords.begin(); itr != m_dynRecords.end(); ++itr)
+            {
+                if ((*itr).x == x && (*itr).y == i &&
+                    ((*itr).type == DYNAMIC_TYPE_BOX/* || (*itr).type == DYNAMIC_TYPE_BOMB*/))
+                {
+                    finalreach = i;
+                    break;
+                }
+            }
+            if (finalreach != -1)
+                break;
+        }
+    }
+    else if (dir == DIR_Y_NEG)
+    {
+        for (int32 i = y; i >= int32(y-reach); i--)
+        {
+            if (i <= 0)
+            {
+                finalreach = i+1;
+                break;
+            }
+
+            if (map->field[x][i].type == TYPE_SOLID_BOX || map->field[x][i].type == TYPE_ROCK)
+            {
+                finalreach = i+1;
+                break;
+            }
+
+            for (std::list<DynamicRecord>::iterator itr = m_dynRecords.begin(); itr != m_dynRecords.end(); ++itr)
+            {
+                if ((*itr).x == x && (*itr).y == i &&
+                    ((*itr).type == DYNAMIC_TYPE_BOX/* || (*itr).type == DYNAMIC_TYPE_BOMB*/))
+                {
+                    finalreach = i;
+                    break;
+                }
+            }
+            if (finalreach != -1)
+                break;
+        }
+    }
+
+    if (finalreach == -1)
+        return reach;
+
+    if (dir == DIR_X_POS || dir == DIR_X_NEG)
+        return abs(int32(x) - finalreach);
+    else
+        return abs(int32(y) - finalreach);
+}
+
+void Instance::Update()
+{
+    while (m_sharedMapsLock)
+        boost::this_thread::yield();
+
+    m_sharedMapsLock = true;
+
+    while (m_playerMapLock)
+        boost::this_thread::yield();
+
+    m_playerMapLock = true;
+
+    uint32 i;
+    uint32 bombDists[4];
+    DangerousField df;
+
+    for (std::list<BombRecord>::iterator itr = m_bombMap.begin(); itr != m_bombMap.end(); )
+    {
+        // boom!
+        if ((*itr).boomTime < clock())
+        {
+            for (i = 0; i < 4; i++)
+                bombDists[i] = GetBombingDistanceInDir((*itr).x, (*itr).y, (*itr).reach, i);
+
+            // ! Debug vypis mapy !
+            /*Map* map = sMapManager->GetMap(mapId);
+            bool found = false;
+            for (uint32 j = 0; j < map->field.size(); j++)
+            {
+                for (i = 0; i < map->field[j].size(); i++)
+                {
+                    found = false;
+                    for (std::list<DynamicRecord>::iterator ittr = m_dynRecords.begin(); ittr != m_dynRecords.end(); ++ittr)
+                        if (ittr->x == i && ittr->y == j)
+                        {
+                            sLog->SetConsoleColor(1);
+                            sLog->StringOutLine("%u", ittr->type);
+                            sLog->SetConsoleColor(0);
+                            found = true;
+                            break;
+                        }
+                    if (!found)
+                    {
+                        if (i <= (*itr).x + bombDists[DIR_X_POS] && i >= (*itr).x && j == (*itr).y)
+                            sLog->SetConsoleColor(3);
+                        if (i >= (*itr).x - bombDists[DIR_X_NEG] && i <= (*itr).x && j == (*itr).y)
+                            sLog->SetConsoleColor(3);
+                        if (j <= (*itr).y + bombDists[DIR_Y_POS] && j >= (*itr).y && i == (*itr).x)
+                            sLog->SetConsoleColor(3);
+                        if (j >= (*itr).y + bombDists[DIR_Y_NEG] && j <= (*itr).y && i == (*itr).x)
+                            sLog->SetConsoleColor(3);
+
+                        sLog->StringOutLine("%u", map->field[i][j].type);
+
+                        sLog->SetConsoleColor(0);
+                    }
+                }
+                sLog->StaticOut("");
+            }*/
+
+            Player* owner = sSession->GetPlayerById((*itr).owner);
+            if (owner)
+                owner->m_activeBombs--;
+
+            if (bombDists[DIR_X_POS])
+            {
+                for (i = 1; i <= bombDists[DIR_X_POS]; i++)
+                {
+                    df.x = (*itr).x + i;
+                    df.y = (*itr).y;
+                    df.activeSince = clock() + i*100 + 2500;
+                    df.activeTime = 800;
+                    df.registered = false;
+                    m_dangerousMap.push_back(df);
+                }
+            }
+
+            if (bombDists[DIR_X_NEG])
+            {
+                for (i = 1; i <= bombDists[DIR_X_NEG]; i++)
+                {
+                    df.x = (*itr).x - i;
+                    df.y = (*itr).y;
+                    df.activeSince = clock() + i*100 + 2500;
+                    df.activeTime = 800;
+                    df.registered = false;
+                    m_dangerousMap.push_back(df);
+                }
+            }
+
+            if (bombDists[DIR_Y_POS])
+            {
+                for (i = 1; i <= bombDists[DIR_Y_POS]; i++)
+                {
+                    df.x = (*itr).x;
+                    df.y = (*itr).y + i;
+                    df.activeSince = clock() + i*100 + 2500;
+                    df.activeTime = 800;
+                    df.registered = false;
+                    m_dangerousMap.push_back(df);
+                }
+            }
+
+            if (bombDists[DIR_Y_NEG])
+            {
+                for (i = 1; i <= bombDists[DIR_Y_NEG]; i++)
+                {
+                    df.x = (*itr).x;
+                    df.y = (*itr).y - i;
+                    df.activeSince = clock() + i*100 + 2500;
+                    df.activeTime = 800;
+                    df.registered = false;
+                    m_dangerousMap.push_back(df);
+                }
+            }
+
+            df.x = (*itr).x;
+            df.y = (*itr).y;
+            df.activeSince = clock() + 2500;
+            df.activeTime = 800;
+            df.registered = false;
+            m_dangerousMap.push_back(df);
+
+            for (std::list<DynamicRecord>::iterator iter = m_dynRecords.begin(); iter != m_dynRecords.end(); ++iter)
+            {
+                if ((*iter).x == (*itr).x && (*iter).y == (*itr).y && (*iter).type == DYNAMIC_TYPE_BOMB)
+                {
+                    m_dynRecords.erase(iter);
+                    break;
+                }
+            }
+
+            itr = m_bombMap.erase(itr);
+            continue;
+        }
+    }
+
+    for (std::list<DangerousField>::iterator itr = m_dangerousMap.begin(); itr != m_dangerousMap.end(); )
+    {
+        if (!(*itr).registered && (*itr).activeSince >= clock())
+        {
+            (*itr).registered = true;
+
+            for (i = 0; i < MAX_PLAYERS_PER_INSTANCE; i++)
+            {
+                if (pPlayers[i] && ceil(fabs(pPlayers[i]->m_positionX)) == (*itr).x && ceil(fabs(pPlayers[i]->m_positionY)) == (*itr).y)
+                {
+                    SmartPacket die(SMSG_PLAYER_DIED);
+                    die << uint32(pPlayers[i]->m_socket);
+                    die << float(pPlayers[i]->m_positionX);
+                    die << float(pPlayers[i]->m_positionY);
+                    sInstanceManager->SendInstancePacket(&die, id, true);
+                }
+            }
+
+            for (std::list<DynamicRecord>::iterator iter = m_dynRecords.begin(); iter != m_dynRecords.end(); ++iter)
+            {
+                if ((*iter).x == (*itr).x && (*iter).y == (*itr).y && (*iter).type == DYNAMIC_TYPE_BOX)
+                {
+                    SmartPacket box(SMSG_BOX_DESTROYED);
+                    box << uint32((*iter).x);
+                    box << uint32((*iter).y);
+                    sInstanceManager->SendInstancePacket(&box, id, true);
+
+                    m_dynRecords.erase(iter);
+                    break;
+                }
+            }
+        }
+
+        if ((*itr).registered && (*itr).activeSince + clock_t((*itr).activeTime) < clock())
+            itr = m_dangerousMap.erase(itr);
+        else
+            ++itr;
+    }
+
+    m_playerMapLock  = false;
+    m_sharedMapsLock = false;
 }

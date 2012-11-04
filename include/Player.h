@@ -29,6 +29,8 @@ struct Player: public Client
     // Pocitadlo pro kazdy bonus - kolikrat byl sebran
     uint8 m_bonuses[MAX_BONUSES];
 
+    uint32 m_activeBombs;
+
     std::string m_nickName;
 };
 

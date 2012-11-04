@@ -15,12 +15,14 @@
 class Application
 {
   public:
-    Application() { }
+    Application() { m_commandQueueLock = false; }
 
     void init();
     void abort(const char* reason);
     void abort();
     void run();
+
+    void Update();
 
     bool HandleConsoleCommand(const char* input);
 
@@ -34,6 +36,10 @@ class Application
         bool sessionworker;
         bool sessionacceptor;
     } ThreadStatus;
+
+  private:
+      std::list< std::string > m_commandQueue;
+      bool m_commandQueueLock;
 };
 
 static Application* sApp = Singleton<Application>::Instance();

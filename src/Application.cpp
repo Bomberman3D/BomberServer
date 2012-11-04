@@ -17,7 +17,6 @@
 #include "Instance.h"
 
 #include <ctime>
-#include <boost/thread.hpp>
 
 void Application::init()
 {
@@ -70,6 +69,34 @@ void Application::init()
     sLog->StaticOut("");
 }
 
+void Application::Update()
+{
+    while (1)
+    {
+        while (m_commandQueueLock)
+            boost::this_thread::yield();
+
+        m_commandQueueLock = true;
+        for (std::list< std::string >::iterator itr = m_commandQueue.begin(); itr != m_commandQueue.end(); )
+        {
+            if (!HandleConsoleCommand((*itr).c_str()))
+                sLog->StringOut("No such command %s", (*itr).c_str());
+
+            itr = m_commandQueue.erase(itr);
+        }
+        m_commandQueueLock = false;
+
+        sInstanceManager->Update();
+
+        boost::this_thread::yield();
+    }
+}
+
+void runAppUpdateThread()
+{
+    sApp->Update();
+}
+
 void Application::run()
 {
     sLog->StaticOut("Successfully loaded!");
@@ -96,7 +123,16 @@ void Application::run()
         abort("Failed to start all threads in 5 seconds time limit");
 
     sLog->StaticOut("");
-    sLog->StaticOut("All threads running");
+    sLog->StaticOut("All support threads running");
+    sLog->StaticOut("Starting update thread...");
+
+    boost::thread updateThread(runAppUpdateThread);
+
+    sLog->StaticOut("Update thread running!");
+
+    sLog->StaticOut("");
+
+    sLog->StaticOut("Ready!\n");
 
     std::string input; // Used for storing user input
 
@@ -105,8 +141,12 @@ void Application::run()
         input.clear();
         std::getline(std::cin,input);
 
-        if (!HandleConsoleCommand(input.c_str()))
-            sLog->StringOut("No such command.");
+        while (m_commandQueueLock)
+            boost::this_thread::yield();
+
+        m_commandQueueLock = true;
+        m_commandQueue.push_back(input.c_str());
+        m_commandQueueLock = false;
 
         boost::this_thread::yield();
     }

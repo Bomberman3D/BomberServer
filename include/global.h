@@ -10,6 +10,14 @@
 #define __GLOBAL_H_
 
 #include <iostream>
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <list>
+#include <map>
+#include <vector>
+
+#include <boost/thread.hpp>
 
 #include "Shared/Shared.h"
 

@@ -94,16 +94,25 @@ void Session::Worker()
                 {
                     sLog->NetworkOut(pClient,"Received data, size: %u",result);
                     SmartPacket* parsed = BuildPacket(buf,result);
-                    ProcessPacket(parsed, pClient);
-
-                    int32 totalparsed = parsed->GetSize()+8;
-                    while (totalparsed < result)
+                    if (parsed)
                     {
-                        parsed = BuildPacket(buf+totalparsed, result-totalparsed);
-                        sLog->NetworkOut(pClient,"Parsed additional %u bytes",parsed->GetSize());
+                        sLog->NetworkOut(pClient,"Opcode 0x%.2X, size %u", parsed->GetOpcode(), parsed->GetSize());
                         ProcessPacket(parsed, pClient);
 
-                        totalparsed += parsed->GetSize()+8;
+                        int32 totalparsed = parsed->GetSize()+8;
+                        while (totalparsed < result)
+                        {
+                            parsed = BuildPacket(buf+totalparsed, result-totalparsed);
+                            if (parsed)
+                            {
+                                sLog->NetworkOut(pClient,"Parsed additional %u bytes",parsed->GetSize());
+                                sLog->NetworkOut(pClient,"Opcode 0x%.2X, size %u", parsed->GetOpcode(), parsed->GetSize());
+                                ProcessPacket(parsed, pClient);
+                                totalparsed += parsed->GetSize()+8;
+                            }
+                            else
+                                break;
+                        }
                     }
                 }
                 else if (result == 0 || error == SOCKETCONNRESET)
@@ -201,6 +210,20 @@ Player* Session::GetPlayerByName(const char* name)
     for (std::list<Player*>::iterator itr = clientList.begin(); itr != clientList.end(); ++itr)
     {
         if (mstrcmp((*itr)->m_nickName.c_str(), name) == 0)
+            return (*itr);
+    }
+
+    return NULL;
+}
+
+Player* Session::GetPlayerById(uint32 id)
+{
+    if (id == 0)
+        return NULL;
+
+    for (std::list<Player*>::iterator itr = clientList.begin(); itr != clientList.end(); ++itr)
+    {
+        if (id == (*itr)->m_socket)
             return (*itr);
     }
 
