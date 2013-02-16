@@ -149,6 +149,7 @@ void Session::ProcessPacket(SmartPacket* packet, Player* pSource)
             response << float(pSource->m_positionX); // startovni pozice X
             response << float(pSource->m_positionY); // startovni pozice Y (klientsky Z)
             response << uint32(pSource->m_socket);   // jako ID pouzijeme socket ID
+            response << uint32(pSource->m_modelIdOffset); // offset model artkitu
             response << uint32(pInstance->mapId);
             response << instanceId;
             SendPacket(pSource, &response);
