@@ -435,16 +435,6 @@ uint32 Instance::GetBombingDistanceInDir(uint32 x, uint32 y, uint32 reach, uint8
 
 void Instance::Update()
 {
-    while (m_sharedMapsLock)
-        boost::this_thread::yield();
-
-    m_sharedMapsLock = true;
-
-    while (m_playerMapLock)
-        boost::this_thread::yield();
-
-    m_playerMapLock = true;
-
     uint32 i;
     uint32 bombDists[4];
     DangerousField df;
@@ -609,6 +599,6 @@ void Instance::Update()
             ++itr;
     }
 
-    m_playerMapLock  = false;
-    m_sharedMapsLock = false;
+    /*m_playerMapLock  = false;
+    m_sharedMapsLock = false;*/
 }

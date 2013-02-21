@@ -96,7 +96,7 @@ void Application::Update()
 
         sInstanceManager->Update();
 
-        boost::this_thread::yield();
+        boost::this_thread::sleep(boost::posix_time::milliseconds(1));
     }
 }
 

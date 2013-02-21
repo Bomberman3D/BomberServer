@@ -111,7 +111,7 @@ void Session::Worker()
         if (clientList.empty())
         {
             // Wait for longer period, no need to check for socket traffic so often if nobody's connected
-            boost::this_thread::yield();
+            boost::this_thread::sleep(boost::posix_time::milliseconds(100));
             continue;
         }
 
@@ -169,7 +169,8 @@ void Session::Worker()
         }
 
         // Some waiting time, could be changed if needed, but thread have to wait since select() is not present
-        boost::this_thread::yield();
+        // technically, this counts as "yield" on Windows
+        boost::this_thread::sleep(boost::posix_time::milliseconds(1));
     }
 }
 
