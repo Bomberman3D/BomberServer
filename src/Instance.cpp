@@ -125,6 +125,10 @@ void InstanceManager::RegisterPlayer(Player *pPlayer, uint32 instanceId)
             pInstance->pPlayers[i] = pPlayer;
             pInstance->players += 1;
             pPlayer->m_modelIdOffset = i;
+            pPlayer->score.deaths = 0;
+            pPlayer->score.kills = 0;
+
+            pInstance->SendScoreBoard();
 
             pInstance->m_playerMapLock = false;
             return;
@@ -496,6 +500,7 @@ void Instance::Update()
                     df.activeSince = clock() + i*100 + 2500;
                     df.activeTime = 800;
                     df.registered = false;
+                    df.originalOwner = (*itr).owner;
                     m_dangerousMap.push_back(df);
                 }
             }
@@ -509,6 +514,7 @@ void Instance::Update()
                     df.activeSince = clock() + i*100 + 2500;
                     df.activeTime = 800;
                     df.registered = false;
+                    df.originalOwner = (*itr).owner;
                     m_dangerousMap.push_back(df);
                 }
             }
@@ -522,6 +528,7 @@ void Instance::Update()
                     df.activeSince = clock() + i*100 + 2500;
                     df.activeTime = 800;
                     df.registered = false;
+                    df.originalOwner = (*itr).owner;
                     m_dangerousMap.push_back(df);
                 }
             }
@@ -535,6 +542,7 @@ void Instance::Update()
                     df.activeSince = clock() + i*100 + 2500;
                     df.activeTime = 800;
                     df.registered = false;
+                    df.originalOwner = (*itr).owner;
                     m_dangerousMap.push_back(df);
                 }
             }
@@ -544,6 +552,7 @@ void Instance::Update()
             df.activeSince = clock() + 2500;
             df.activeTime = 800;
             df.registered = false;
+            df.originalOwner = (*itr).owner;
             m_dangerousMap.push_back(df);
 
             for (std::list<DynamicRecord>::iterator iter = m_dynRecords.begin(); iter != m_dynRecords.end(); ++iter)
@@ -574,7 +583,20 @@ void Instance::Update()
                     die << uint32(pPlayers[i]->m_socket);
                     die << float(pPlayers[i]->m_positionX);
                     die << float(pPlayers[i]->m_positionY);
+                    die << uint32(DEFAULT_RESPAWN_TIME);
                     sInstanceManager->SendInstancePacket(&die, id, true);
+
+                    // score part
+                    if ((*itr).originalOwner)
+                    {
+                        Player* owner = sSession->GetPlayerById((*itr).originalOwner);
+                        if (owner)
+                            owner->score.kills += 1;
+                    }
+                    pPlayers[i]->score.deaths += 1;
+
+                    // and update scoreboard
+                    SendScoreBoard();
                 }
             }
 
@@ -601,4 +623,28 @@ void Instance::Update()
 
     /*m_playerMapLock  = false;
     m_sharedMapsLock = false;*/
+}
+
+void Instance::SendScoreBoard()
+{
+    SmartPacket data(SMSG_SCOREBOARD);
+
+    uint32 plCount = 0;
+    for (uint32 i = 0; i < MAX_PLAYERS_PER_INSTANCE; i++)
+        if (pPlayers[i] != NULL)
+            plCount++;
+
+    data << uint32(plCount);
+
+    for (uint32 i = 0; i < MAX_PLAYERS_PER_INSTANCE; i++)
+    {
+        if (pPlayers[i] != NULL)
+        {
+            data << pPlayers[i]->m_nickName.c_str();
+            data << uint32(pPlayers[i]->score.kills);
+            data << uint32(pPlayers[i]->score.deaths);
+        }
+    }
+
+    sInstanceManager->SendInstancePacket(&data, id);
 }

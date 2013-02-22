@@ -41,6 +41,7 @@ enum Opcodes
     SMSG_NEW_BONUS                 = 0x16,
     CMSG_BONUS_TAKEN               = 0x17,
     SMSG_BONUS_TAKEN               = 0x18,
+    SMSG_SCOREBOARD                = 0x19,
     MAX_OPCODE
 };
 

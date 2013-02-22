@@ -11,6 +11,8 @@
 #define MAX_INSTANCES 10
 #define MAX_PLAYERS_PER_INSTANCE 4
 
+#define DEFAULT_RESPAWN_TIME 5  // 5 seconds to respawn
+
 class Instance
 {
 public:
@@ -25,6 +27,7 @@ public:
     };
     bool AddBomb(uint32 x, uint32 y, uint32 owner, uint32 reach);
     void Update();
+    void SendScoreBoard();
     int32 id;
     std::string instanceName;
     uint32 mapId;
@@ -59,6 +62,7 @@ public:
         clock_t activeSince;
         uint32  activeTime;
         bool    registered;
+        uint32  originalOwner;
     };
     std::list<DangerousField> m_dangerousMap;
 

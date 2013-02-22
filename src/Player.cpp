@@ -18,4 +18,7 @@ Player::Player() : Client()
     m_nickName = "ABCDEFGH";
 
     m_isMoving = false;
+
+    score.deaths = 0;
+    score.kills = 0;
 }

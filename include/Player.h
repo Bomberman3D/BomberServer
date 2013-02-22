@@ -32,6 +32,12 @@ struct Player: public Client
     uint32 m_activeBombs;
 
     std::string m_nickName;
+
+    struct t_Score
+    {
+        uint32 deaths;
+        uint32 kills;
+    } score;
 };
 
 #endif
