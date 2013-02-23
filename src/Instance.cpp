@@ -89,7 +89,7 @@ const char* InstanceManager::GetInstanceString()
 
         str << itr->first << "|";
         str << itr->second->instanceName.c_str() << "|";
-        str << itr->second->players << "/" << itr->second->maxplayers << "|";
+        str << itr->second->players << "|" << itr->second->maxplayers << "|";
         str << sMapManager->GetMapName(itr->second->mapId);
     }
 
