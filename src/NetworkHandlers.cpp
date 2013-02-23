@@ -312,6 +312,22 @@ void Session::ProcessPacket(SmartPacket* packet, Player* pSource)
             }
             break;
         }
+        case CMSG_CHAT:
+        {
+            Instance* pInstance = sInstanceManager->GetPlayerInstance(pSource);
+            if (!pInstance)
+                break;
+
+            std::string msg = packet->readstr();
+
+            SmartPacket chat(SMSG_CHAT);
+            chat << uint8(0); // chat_msg_player_chat
+            chat << uint32(pSource->m_socket);
+            chat << msg.c_str();
+
+            sInstanceManager->SendInstancePacket(&chat, pInstance->id);
+            break;
+        }
         case MSG_NONE:
         default:
             sLog->ErrorOut("Received unknown/invalid opcode: %u",packet->GetOpcode());
