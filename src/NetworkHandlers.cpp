@@ -11,6 +11,7 @@
 #include "Log.h"
 #include "Storage.h"
 #include "Instance.h"
+#include "Map.h"
 
 void Session::BroadcastPacket(SmartPacket* data)
 {
@@ -139,10 +140,6 @@ void Session::ProcessPacket(SmartPacket* packet, Player* pSource)
                 return;
             }
             Instance* pInstance = sInstanceManager->GetPlayerInstance(pSource);
-
-            // TODO: nacteni start. pozic ze souboru
-            pSource->m_positionX = 1.0f;
-            pSource->m_positionY = 1.0f;
 
             SmartPacket response(SMSG_ENTER_GAME_RESULT);
             response << uint8(0); //vsechno ok
@@ -283,6 +280,35 @@ void Session::ProcessPacket(SmartPacket* packet, Player* pSource)
                 bomb << uint32(y);
                 bomb << uint32(pSource->m_bonuses[BONUS_FLAME]+1); // dosah bomby
                 sInstanceManager->SendInstancePacket(&bomb, pInstance->id);
+            }
+            break;
+        }
+        case CMSG_RESPAWN_REQUEST:
+        {
+            Instance* pInstance = sInstanceManager->GetPlayerInstance(pSource);
+            if (!pInstance)
+                break;
+
+            if (pSource->m_respawnTime && pSource->m_respawnTime <= time(NULL))
+            {
+                pSource->m_respawnTime = 0;
+
+                SmartPacket resp(SMSG_RESPAWN);
+                resp << uint32(pSource->m_socket);
+
+                Map* map = sMapManager->GetMap(pInstance->mapId);
+                if (!map)
+                    break;
+
+                uint8 respPos = rand()%4;
+
+                resp << float(map->startloc[respPos*2]);
+                resp << float(map->startloc[respPos*2+1]);
+
+                pSource->m_positionX = map->startloc[respPos*2]-0.5f;
+                pSource->m_positionY = map->startloc[respPos*2+1]-0.5f;
+
+                sInstanceManager->SendInstancePacket(&resp, pInstance->id);
             }
             break;
         }

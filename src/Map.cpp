@@ -84,10 +84,11 @@ bool MapManager::LoadMap(const char* mappath, Map* dest)
     {
         for (uint32 j = 0; j < dest->field[0].size(); j++)
         {
-            if (dest->field[i][j].type == 3)
+            if (dest->field[i][j].type == TYPE_STARTLOC)
             {
                 dest->startloc[counter*2+0] = i;
                 dest->startloc[counter*2+1] = j;
+                counter++;
             }
         }
     }

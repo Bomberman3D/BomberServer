@@ -33,6 +33,8 @@ struct Player: public Client
 
     std::string m_nickName;
 
+    time_t m_respawnTime;
+
     struct t_Score
     {
         uint32 deaths;

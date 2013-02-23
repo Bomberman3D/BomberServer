@@ -118,6 +118,8 @@ void InstanceManager::RegisterPlayer(Player *pPlayer, uint32 instanceId)
 
     pInstance->m_playerMapLock = true;
 
+    Map* pMap = sMapManager->GetMap(pInstance->mapId);
+
     for (int i = 0; i < MAX_PLAYERS_PER_INSTANCE; i++)
     {
         if (!pInstance->pPlayers[i])
@@ -125,6 +127,18 @@ void InstanceManager::RegisterPlayer(Player *pPlayer, uint32 instanceId)
             pInstance->pPlayers[i] = pPlayer;
             pInstance->players += 1;
             pPlayer->m_modelIdOffset = i;
+
+            if (pMap)
+            {
+                if (pMap->startloc[i*2] != 0 && pMap->startloc[i*2+1] != 0)
+                {
+                    pPlayer->m_positionX = pMap->startloc[i*2];
+                    pPlayer->m_positionY = pMap->startloc[i*2+1];
+                }
+            }
+
+            pPlayer->m_respawnTime = 0;
+
             pPlayer->score.deaths = 0;
             pPlayer->score.kills = 0;
 
@@ -577,7 +591,7 @@ void Instance::Update()
 
             for (i = 0; i < MAX_PLAYERS_PER_INSTANCE; i++)
             {
-                if (pPlayers[i] && ceil(fabs(pPlayers[i]->m_positionX)) == (*itr).x && ceil(fabs(pPlayers[i]->m_positionY)) == (*itr).y)
+                if (pPlayers[i] && pPlayers[i]->m_respawnTime == 0 && ceil(fabs(pPlayers[i]->m_positionX)) == (*itr).x && ceil(fabs(pPlayers[i]->m_positionY)) == (*itr).y)
                 {
                     SmartPacket die(SMSG_PLAYER_DIED);
                     die << uint32(pPlayers[i]->m_socket);
@@ -585,6 +599,8 @@ void Instance::Update()
                     die << float(pPlayers[i]->m_positionY);
                     die << uint32(DEFAULT_RESPAWN_TIME);
                     sInstanceManager->SendInstancePacket(&die, id, true);
+
+                    pPlayers[i]->m_respawnTime = time(NULL) + DEFAULT_RESPAWN_TIME;
 
                     // score part
                     if ((*itr).originalOwner)
