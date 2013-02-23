@@ -303,7 +303,7 @@ bool Instance::AddBomb(uint32 x, uint32 y, uint32 owner, uint32 reach)
     bomb.x = x;
     bomb.y = y;
     bomb.owner = owner;
-    bomb.boomTime = clock()+2500;
+    bomb.boomTime = clock() / CLOCK_MOD+2500;
     bomb.reach = reach;
 
     m_bombMap.push_back(bomb);
@@ -460,7 +460,7 @@ void Instance::Update()
     for (std::list<BombRecord>::iterator itr = m_bombMap.begin(); itr != m_bombMap.end(); )
     {
         // boom!
-        if ((*itr).boomTime < clock())
+        if ((*itr).boomTime < clock() / CLOCK_MOD)
         {
             for (i = 0; i < 4; i++)
                 bombDists[i] = GetBombingDistanceInDir((*itr).x, (*itr).y, (*itr).reach, i);
@@ -511,7 +511,7 @@ void Instance::Update()
                 {
                     df.x = (*itr).x + i;
                     df.y = (*itr).y;
-                    df.activeSince = clock() + i*100 + 2500;
+                    df.activeSince = clock() / CLOCK_MOD + i*100;
                     df.activeTime = 800;
                     df.registered = false;
                     df.originalOwner = (*itr).owner;
@@ -525,7 +525,7 @@ void Instance::Update()
                 {
                     df.x = (*itr).x - i;
                     df.y = (*itr).y;
-                    df.activeSince = clock() + i*100 + 2500;
+                    df.activeSince = clock() / CLOCK_MOD + i*100;
                     df.activeTime = 800;
                     df.registered = false;
                     df.originalOwner = (*itr).owner;
@@ -539,7 +539,7 @@ void Instance::Update()
                 {
                     df.x = (*itr).x;
                     df.y = (*itr).y + i;
-                    df.activeSince = clock() + i*100 + 2500;
+                    df.activeSince = clock() / CLOCK_MOD + i*100;
                     df.activeTime = 800;
                     df.registered = false;
                     df.originalOwner = (*itr).owner;
@@ -553,7 +553,7 @@ void Instance::Update()
                 {
                     df.x = (*itr).x;
                     df.y = (*itr).y - i;
-                    df.activeSince = clock() + i*100 + 2500;
+                    df.activeSince = clock() / CLOCK_MOD + i*100;
                     df.activeTime = 800;
                     df.registered = false;
                     df.originalOwner = (*itr).owner;
@@ -563,7 +563,7 @@ void Instance::Update()
 
             df.x = (*itr).x;
             df.y = (*itr).y;
-            df.activeSince = clock() + 2500;
+            df.activeSince = clock() / CLOCK_MOD;
             df.activeTime = 800;
             df.registered = false;
             df.originalOwner = (*itr).owner;
@@ -585,9 +585,26 @@ void Instance::Update()
 
     for (std::list<DangerousField>::iterator itr = m_dangerousMap.begin(); itr != m_dangerousMap.end(); )
     {
-        if (!(*itr).registered && (*itr).activeSince >= clock())
+        if ((*itr).activeSince <= clock() / CLOCK_MOD)
         {
-            (*itr).registered = true;
+            if (!(*itr).registered)
+            {
+                (*itr).registered = true;
+
+                for (std::list<DynamicRecord>::iterator iter = m_dynRecords.begin(); iter != m_dynRecords.end(); ++iter)
+                {
+                    if ((*iter).x == (*itr).x && (*iter).y == (*itr).y && (*iter).type == DYNAMIC_TYPE_BOX)
+                    {
+                        SmartPacket box(SMSG_BOX_DESTROYED);
+                        box << uint32((*iter).x);
+                        box << uint32((*iter).y);
+                        sInstanceManager->SendInstancePacket(&box, id, true);
+
+                        m_dynRecords.erase(iter);
+                        break;
+                    }
+                }
+            }
 
             for (i = 0; i < MAX_PLAYERS_PER_INSTANCE; i++)
             {
@@ -615,23 +632,9 @@ void Instance::Update()
                     SendScoreBoard();
                 }
             }
-
-            for (std::list<DynamicRecord>::iterator iter = m_dynRecords.begin(); iter != m_dynRecords.end(); ++iter)
-            {
-                if ((*iter).x == (*itr).x && (*iter).y == (*itr).y && (*iter).type == DYNAMIC_TYPE_BOX)
-                {
-                    SmartPacket box(SMSG_BOX_DESTROYED);
-                    box << uint32((*iter).x);
-                    box << uint32((*iter).y);
-                    sInstanceManager->SendInstancePacket(&box, id, true);
-
-                    m_dynRecords.erase(iter);
-                    break;
-                }
-            }
         }
 
-        if ((*itr).registered && (*itr).activeSince + clock_t((*itr).activeTime) < clock())
+        if ((*itr).registered && (*itr).activeSince + clock_t((*itr).activeTime) < clock() / CLOCK_MOD)
             itr = m_dangerousMap.erase(itr);
         else
             ++itr;
