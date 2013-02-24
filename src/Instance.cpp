@@ -33,6 +33,8 @@ bool InstanceManager::InitDefaultInstance()
         pNew->mapId = 1;
         pNew->maxplayers = 4;
         pNew->players = 0;
+        pNew->bonusDelay = DEFAULT_BONUS_DELAY;
+        pNew->nextBonusTime = time(NULL) + DEFAULT_BONUS_DELAY;
 
         pNew->GenerateRandomDynamicRecords();
 
@@ -63,6 +65,8 @@ int32 InstanceManager::InitNewInstance()
             pNew->mapId = 1;
             pNew->maxplayers = 4;
             pNew->players = 0;
+            pNew->bonusDelay = DEFAULT_BONUS_DELAY;
+            pNew->nextBonusTime = time(NULL) + DEFAULT_BONUS_DELAY;
 
             pNew->GenerateRandomDynamicRecords();
 
@@ -318,6 +322,8 @@ void InstanceManager::Update()
     for (std::map<uint32, Instance*>::iterator itr = m_Instances.begin(); itr != m_Instances.end(); ++itr)
         if ((*itr).second)
             (*itr).second->Update();
+
+    boost::this_thread::sleep(boost::posix_time::milliseconds(1));
 }
 
 uint32 Instance::GetBombingDistanceInDir(uint32 x, uint32 y, uint32 reach, uint8 dir)
@@ -457,6 +463,11 @@ void Instance::Update()
     uint32 bombDists[4];
     DangerousField df;
 
+    while (m_sharedMapsLock)
+        boost::this_thread::yield();
+
+    m_sharedMapsLock = true;
+
     for (std::list<BombRecord>::iterator itr = m_bombMap.begin(); itr != m_bombMap.end(); )
     {
         // boom!
@@ -466,7 +477,7 @@ void Instance::Update()
                 bombDists[i] = GetBombingDistanceInDir((*itr).x, (*itr).y, (*itr).reach, i);
 
             // ! Debug vypis mapy !
-            /*Map* map = sMapManager->GetMap(mapId);
+            Map* map = sMapManager->GetMap(mapId);
             bool found = false;
             for (uint32 j = 0; j < map->field.size(); j++)
             {
@@ -499,7 +510,7 @@ void Instance::Update()
                     }
                 }
                 sLog->StaticOut("");
-            }*/
+            }
 
             Player* owner = sSession->GetPlayerById((*itr).owner);
             if (owner)
@@ -583,6 +594,87 @@ void Instance::Update()
         }
     }
 
+    for (std::list<DynamicRecord>::iterator itr = m_dynRecords.begin(); itr != m_dynRecords.end(); )
+    {
+        if ((*itr).endingTime && (*itr).endingTime <= time(NULL))
+        {
+            SmartPacket destroy(SMSG_DYNAMIC_RECORD_DESTROY);
+            destroy << uint32((*itr).x);
+            destroy << uint32((*itr).y);
+            destroy << uint32((*itr).type);
+            destroy << uint32((*itr).misc);
+            sInstanceManager->SendInstancePacket(&destroy, id);
+
+            itr = m_dynRecords.erase(itr);
+            continue;
+        }
+
+        ++itr;
+    }
+
+    if (nextBonusTime < time(NULL))
+    {
+        nextBonusTime = time(NULL) + bonusDelay;
+
+        Map* map = sMapManager->GetMap(mapId);
+        if (map)
+        {
+            std::vector< std::vector<uint8> > full;
+            full.resize(map->field.size());
+            for (uint32 i = 0; i < map->field.size(); i++)
+            {
+                full[i].resize(map->field[0].size());
+                for (uint32 j = 0; j < map->field[0].size(); j++)
+                    full[i][j] = 0;
+            }
+
+            for (std::list<DynamicRecord>::iterator itr = m_dynRecords.begin(); itr != m_dynRecords.end(); ++itr)
+                full[(*itr).x][(*itr).y] = 1;
+
+            uint32 count = 0;
+            for (uint32 i = 0; i < map->field.size(); i++)
+            {
+                for (uint32 j = 0; j < map->field[0].size(); j++)
+                {
+                    if (full[i][j] == 0 && map->field[i][j].type == TYPE_GROUND)
+                        count++;
+                }
+            }
+
+            if (count > 0)
+            {
+                uint32 bonusplace = rand()%count;
+                for (uint32 i = 0; i < map->field.size(); i++)
+                {
+                    for (uint32 j = 0; j < map->field[0].size(); j++)
+                    {
+                        if (full[i][j] == 0 && map->field[i][j].type == TYPE_GROUND)
+                        {
+                            if (--bonusplace == 0)
+                            {
+                                // place bonus
+                                DynamicRecord bon;
+                                bon.x = i;
+                                bon.y = j;
+                                bon.type = DYNAMIC_TYPE_BONUS;
+                                bon.endingTime = time(NULL) + DEFAULT_BONUS_DURATION;
+                                bon.misc = rand()%MAX_BONUSES;
+
+                                m_dynRecords.push_back(bon);
+
+                                SmartPacket bdata(SMSG_NEW_BONUS);
+                                bdata << uint32(i);
+                                bdata << uint32(j);
+                                bdata << uint32(bon.misc);
+                                sInstanceManager->SendInstancePacket(&bdata, id);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     for (std::list<DangerousField>::iterator itr = m_dangerousMap.begin(); itr != m_dangerousMap.end(); )
     {
         if ((*itr).activeSince <= clock() / CLOCK_MOD)
@@ -640,8 +732,7 @@ void Instance::Update()
             ++itr;
     }
 
-    /*m_playerMapLock  = false;
-    m_sharedMapsLock = false;*/
+    m_sharedMapsLock = false;
 }
 
 void Instance::SendScoreBoard()

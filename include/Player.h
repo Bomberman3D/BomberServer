@@ -7,9 +7,9 @@
 // Zatim jen 3 bonusy, implementovano bude pozdeji
 enum Bonuses
 {
-    BONUS_SPEED = 0,
-    BONUS_BOMB,
-    BONUS_FLAME,
+    BONUS_FLAME = 0,
+    BONUS_SPEED = 1,
+    BONUS_BOMB  = 2,
     MAX_BONUSES
 };
 

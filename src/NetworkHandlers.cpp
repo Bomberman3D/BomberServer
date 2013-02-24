@@ -182,7 +182,7 @@ void Session::ProcessPacket(SmartPacket* packet, Player* pSource)
 
                 mapdata << uint32(pInstance->m_dynRecords.size());
                 for (std::list<Instance::DynamicRecord>::const_iterator itr = pInstance->m_dynRecords.begin(); itr != pInstance->m_dynRecords.end(); ++itr)
-                    mapdata << uint16((*itr).x) << uint16((*itr).y) << uint8((*itr).type);
+                    mapdata << uint16((*itr).x) << uint16((*itr).y) << uint8((*itr).type) << uint8((*itr).misc);
 
                 pInstance->m_sharedMapsLock = false;
 
@@ -270,6 +270,10 @@ void Session::ProcessPacket(SmartPacket* packet, Player* pSource)
             *packet >> x;
             *packet >> y;
 
+            // Pokud hrac nema dostatek bonusu pro vice jak jednu bombu, nepokladame
+            if (pSource->m_activeBombs >= (uint8)(pSource->m_bonuses[BONUS_BOMB]+1))
+                break;
+
             if (pInstance->AddBomb(x, y, pSource->m_socket, pSource->m_bonuses[BONUS_FLAME]+1))
             {
                 pSource->m_activeBombs += 1;
@@ -326,6 +330,31 @@ void Session::ProcessPacket(SmartPacket* packet, Player* pSource)
             chat << msg.c_str();
 
             sInstanceManager->SendInstancePacket(&chat, pInstance->id);
+            break;
+        }
+        case CMSG_BONUS_TAKEN:
+        {
+            Instance* pInstance = sInstanceManager->GetPlayerInstance(pSource);
+            if (!pInstance)
+                break;
+
+            uint32 dynX, dynY;
+
+            *packet >> dynX >> dynY;
+
+            while (pInstance->m_sharedMapsLock)
+                boost::this_thread::sleep(boost::posix_time::milliseconds(1));
+
+            pInstance->m_sharedMapsLock = true;
+
+            for (std::list<Instance::DynamicRecord>::iterator itr = pInstance->m_dynRecords.begin(); itr != pInstance->m_dynRecords.end(); ++itr)
+                if ((*itr).x == dynX && (*itr).y == dynY && (*itr).type == DYNAMIC_TYPE_BONUS)
+                {
+                    pSource->m_bonuses[(*itr).misc]++;
+                    (*itr).endingTime = time(NULL); // instance update ho odstrani
+                }
+
+            pInstance->m_sharedMapsLock = false;
             break;
         }
         case MSG_NONE:

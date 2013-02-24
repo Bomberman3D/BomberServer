@@ -11,7 +11,9 @@
 #define MAX_INSTANCES 10
 #define MAX_PLAYERS_PER_INSTANCE 4
 
-#define DEFAULT_RESPAWN_TIME 5  // 5 seconds to respawn
+#define DEFAULT_RESPAWN_TIME 5    // 5 seconds to respawn
+#define DEFAULT_BONUS_DELAY  30   // 30 seconds to spawn bonus
+#define DEFAULT_BONUS_DURATION 60 // 60 seconds duration
 
 class Instance
 {
@@ -34,6 +36,9 @@ public:
     uint32 players;
     uint32 maxplayers;
 
+    time_t nextBonusTime; // cas, kdy se objevi dalsi bonus
+    uint32 bonusDelay;    // cas mezi bonusy
+
     // Sdileny zamek pro vsechny mapy! Ve vetsine pripadu by se stejne jednalo o zamceni vsech najednou
     bool m_sharedMapsLock;
     // Zamek pro pole hracu
@@ -41,9 +46,20 @@ public:
 
     struct DynamicRecord
     {
+        DynamicRecord()
+        {
+            x = 0;
+            y = 0;
+            type = 0;
+            misc = 0;
+            endingTime = 0;
+        };
+
         uint32 x;
         uint32 y;
         uint8 type;
+        uint8 misc;
+        time_t endingTime;
     };
     std::list<DynamicRecord> m_dynRecords;
     void GenerateRandomDynamicRecords();
